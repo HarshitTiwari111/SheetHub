@@ -24,7 +24,7 @@ const authLimiter = rateLimit({
 
 const cookieOptions = () => ({
   httpOnly: true,
-  sameSite: 'lax',
+  sameSite: process.env.COOKIE_SECURE === 'true' ? 'none' : 'lax',
   secure: process.env.COOKIE_SECURE === 'true',
   domain: process.env.COOKIE_DOMAIN || undefined,
   maxAge: refreshTokenDurationMs(),

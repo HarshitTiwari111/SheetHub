@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: '/api', withCredentials: true });
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const api = axios.create({ baseURL: API_BASE, withCredentials: true });
 
 let accessToken = localStorage.getItem('sheethub_token') || null;
 
@@ -28,7 +29,7 @@ api.interceptors.response.use(
       try {
         if (!refreshing) {
           refreshing = axios
-            .post('/api/auth/refresh', {}, { withCredentials: true })
+            .post(`${API_BASE}/auth/refresh`, {}, { withCredentials: true })
             .then((r) => {
               setAccessToken(r.data.token);
               return r.data.token;
