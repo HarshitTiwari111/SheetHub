@@ -61,7 +61,7 @@ export default function SheetView() {
   const [err, setErr] = useState('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(100);
   const [showFilters, setShowFilters] = useState(false);
   const filterBtnRef = useRef(null);
   const [dateColumn, setDateColumn] = useState(null);
