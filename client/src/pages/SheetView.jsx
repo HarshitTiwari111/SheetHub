@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 
 function getPageNumbers(current, total) {
@@ -30,13 +30,16 @@ function TimeAgo({ ts }) {
   return <span>{Math.floor(hrs / 24)}d ago</span>;
 }
 
-import { RefreshCw, Search, ExternalLink, Pencil, Trash2, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, Search, ExternalLink, Pencil, Trash2, Clock, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import api from '../api/client';
 import { useImpersonation } from '../context/ImpersonationContext.jsx';
 import { isAdminLevel } from '../context/AuthContext.jsx';
 import { useSheetData, SYNC_OPTIONS } from '../context/SheetDataContext.jsx';
 import AddSheetModal from '../components/AddSheetModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import FilterPanel from '../components/FilterPanel.jsx';
+import TotalsBar from '../components/TotalsBar.jsx';
+import { detectColumnTypes, aggregate, parseDate, fromDateInput } from '../utils/columnAnalysis';
 
 export default function SheetView() {
   const { id } = useParams();
@@ -59,6 +62,12 @@ export default function SheetView() {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [showFilters, setShowFilters] = useState(false);
+  const filterBtnRef = useRef(null);
+  const [dateColumn, setDateColumn] = useState(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [selectedMetrics, setSelectedMetrics] = useState([]);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -140,11 +149,59 @@ export default function SheetView() {
     // eslint-disable-next-line
   }, [id, activeGid]);
 
+  const columnTypes = useMemo(
+    () => detectColumnTypes(data.headers, data.rows),
+    [data.headers, data.rows]
+  );
+
   const filtered = useMemo(() => {
-    if (!q.trim()) return data.rows;
-    const term = q.toLowerCase();
-    return data.rows.filter((r) => r.some((c) => String(c).toLowerCase().includes(term)));
-  }, [q, data.rows]);
+    let rows = data.rows;
+    if (q.trim()) {
+      const term = q.toLowerCase();
+      rows = rows.filter((r) => r.some((c) => String(c).toLowerCase().includes(term)));
+    }
+    if (dateColumn !== null && (dateFrom || dateTo)) {
+      const from = fromDateInput(dateFrom, false);
+      const to = fromDateInput(dateTo, true);
+      rows = rows.filter((r) => {
+        const d = parseDate(r[dateColumn]);
+        if (!d) return false;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+      });
+    }
+    return rows;
+  }, [q, data.rows, dateColumn, dateFrom, dateTo]);
+
+  const toggleMetric = (colIdx, metric) => {
+    setSelectedMetrics((prev) => {
+      const exists = prev.some((s) => s.colIdx === colIdx && s.metric === metric);
+      if (exists) return prev.filter((s) => !(s.colIdx === colIdx && s.metric === metric));
+      const others = prev.filter((s) => s.colIdx !== colIdx);
+      return [...others, { colIdx, metric }];
+    });
+  };
+
+  const clearFilters = () => {
+    setDateColumn(null);
+    setDateFrom('');
+    setDateTo('');
+    setSelectedMetrics([]);
+  };
+
+  const totals = useMemo(() => {
+    return selectedMetrics.map(({ colIdx, metric }) => ({
+      name: data.headers[colIdx],
+      metric,
+      value: aggregate(filtered, colIdx, metric),
+    }));
+  }, [selectedMetrics, filtered, data.headers]);
+
+  useEffect(() => {
+    clearFilters();
+    setShowFilters(false);
+  }, [id, activeGid]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -192,6 +249,39 @@ export default function SheetView() {
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
             {refreshing ? 'Syncing...' : 'Sync Now'}
           </button>
+          <div className="relative" ref={filterBtnRef}>
+            <button
+              onClick={() => setShowFilters((s) => !s)}
+              className={`flex items-center gap-1 px-3 py-1.5 border rounded text-sm ${
+                selectedMetrics.length > 0 || dateColumn !== null
+                  ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+              title="Filter and totals"
+            >
+              <Filter size={14} /> Filters
+              {(selectedMetrics.length > 0 || dateColumn !== null) && (
+                <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              )}
+            </button>
+            {showFilters && data.headers.length > 0 && (
+              <FilterPanel
+                headers={data.headers}
+                columnTypes={columnTypes}
+                dateColumn={dateColumn}
+                setDateColumn={setDateColumn}
+                dateFrom={dateFrom}
+                setDateFrom={setDateFrom}
+                dateTo={dateTo}
+                setDateTo={setDateTo}
+                selectedMetrics={selectedMetrics}
+                toggleMetric={toggleMetric}
+                clearAll={clearFilters}
+                onClose={() => setShowFilters(false)}
+                anchorRef={filterBtnRef}
+              />
+            )}
+          </div>
           {canManageSheet && sheet && (
             <>
               <button
@@ -343,6 +433,13 @@ export default function SheetView() {
           </span>
         )}
       </div>
+
+      <TotalsBar
+        totals={totals}
+        filteredCount={filtered.length}
+        totalCount={data.rows.length}
+        onClear={() => setSelectedMetrics([])}
+      />
 
       {showEdit && sheet && (
         <AddSheetModal
