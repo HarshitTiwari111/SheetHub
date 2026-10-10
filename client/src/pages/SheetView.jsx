@@ -30,7 +30,7 @@ function TimeAgo({ ts }) {
   return <span>{Math.floor(hrs / 24)}d ago</span>;
 }
 
-import { RefreshCw, Search, ExternalLink, Pencil, Trash2, Clock, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { RefreshCw, Search, ExternalLink, Pencil, Trash2, Clock, ChevronLeft, ChevronRight, Filter, ArrowUp, ArrowDown, ArrowUpDown, X } from 'lucide-react';
 import api from '../api/client';
 import { useImpersonation } from '../context/ImpersonationContext.jsx';
 import { isAdminLevel } from '../context/AuthContext.jsx';
@@ -71,6 +71,10 @@ export default function SheetView() {
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // ASC / DESC Column Sorting State
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState('asc'); // 'asc' or 'desc'
 
   const doDelete = async () => {
     setDeleting(true);
@@ -116,12 +120,10 @@ export default function SheetView() {
     try {
       const { data } = await api.get(`/sheets/${id}/tabs`);
       setTabs(data.tabs || []);
-      // If no active gid, pick first tab
       if (!activeGid && data.tabs?.length > 0) {
         setActiveGid(data.tabs[0].gid);
       }
     } catch (e) {
-      // Fallback: single tab
       setTabs([{ gid: '0', name: 'Sheet1' }]);
       if (!activeGid) setActiveGid('0');
     } finally {
@@ -154,12 +156,29 @@ export default function SheetView() {
     [data.headers, data.rows]
   );
 
+  // Column Header Sort Toggle
+  const handleHeaderClick = (colIdx) => {
+    if (sortCol !== colIdx) {
+      setSortCol(colIdx);
+      setSortDir('asc');
+    } else if (sortDir === 'asc') {
+      setSortDir('desc');
+    } else {
+      setSortCol(null);
+      setSortDir('asc');
+    }
+  };
+
   const filtered = useMemo(() => {
-    let rows = data.rows;
+    let rows = [...data.rows];
+
+    // 1. Search filter
     if (q.trim()) {
       const term = q.toLowerCase();
       rows = rows.filter((r) => r.some((c) => String(c).toLowerCase().includes(term)));
     }
+
+    // 2. Date range filter
     if (dateColumn !== null && (dateFrom || dateTo)) {
       const from = fromDateInput(dateFrom, false);
       const to = fromDateInput(dateTo, true);
@@ -171,8 +190,50 @@ export default function SheetView() {
         return true;
       });
     }
+
+    // 3. Column Sorting (Ascending / Descending)
+    if (sortCol !== null && sortCol >= 0 && sortCol < data.headers.length) {
+      const isNumType = columnTypes[sortCol] === 'number';
+      const isDateType = columnTypes[sortCol] === 'date';
+
+      rows.sort((rowA, rowB) => {
+        const valA = rowA[sortCol] ?? '';
+        const valB = rowB[sortCol] ?? '';
+
+        const emptyA = valA === '' || valA === null || valA === undefined;
+        const emptyB = valB === '' || valB === null || valB === undefined;
+        if (emptyA && emptyB) return 0;
+        if (emptyA) return 1;
+        if (emptyB) return -1;
+
+        let res = 0;
+
+        if (isNumType) {
+          const numA = parseFloat(String(valA).replace(/[^0-9.-]/g, ''));
+          const numB = parseFloat(String(valB).replace(/[^0-9.-]/g, ''));
+          if (!isNaN(numA) && !isNaN(numB)) {
+            res = numA - numB;
+          } else {
+            res = String(valA).localeCompare(String(valB), undefined, { numeric: true });
+          }
+        } else if (isDateType) {
+          const dateA = parseDate(valA);
+          const dateB = parseDate(valB);
+          if (dateA && dateB) {
+            res = dateA.getTime() - dateB.getTime();
+          } else {
+            res = String(valA).localeCompare(String(valB), undefined, { numeric: true });
+          }
+        } else {
+          res = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+        }
+
+        return sortDir === 'asc' ? res : -res;
+      });
+    }
+
     return rows;
-  }, [q, data.rows, dateColumn, dateFrom, dateTo]);
+  }, [q, data.rows, data.headers, dateColumn, dateFrom, dateTo, sortCol, sortDir, columnTypes]);
 
   const toggleMetric = (colIdx, metric) => {
     setSelectedMetrics((prev) => {
@@ -200,6 +261,8 @@ export default function SheetView() {
 
   useEffect(() => {
     clearFilters();
+    setSortCol(null);
+    setSortDir('asc');
     setShowFilters(false);
   }, [id, activeGid]);
 
@@ -208,7 +271,8 @@ export default function SheetView() {
   const pageStart = (currentPage - 1) * pageSize;
   const pageRows = filtered.slice(pageStart, pageStart + pageSize);
 
-  useEffect(() => { setPage(1); }, [q, id, pageSize]);
+  useEffect(() => { setPage(1); }, [q, id, pageSize, sortCol, sortDir]);
+
 
   return (
     <div className="space-y-4">
@@ -328,6 +392,21 @@ export default function SheetView() {
         </div>
       )}
 
+      {sortCol !== null && sortCol >= 0 && sortCol < data.headers.length && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs text-indigo-800 dark:text-indigo-200 w-fit">
+          <span>
+            Sorted by <strong>{data.headers[sortCol]}</strong> ({sortDir.toUpperCase() === 'ASC' ? 'Ascending ↑' : 'Descending ↓'})
+          </span>
+          <button
+            onClick={() => { setSortCol(null); setSortDir('asc'); }}
+            className="p-0.5 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded transition"
+            title="Clear column sort"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
         {loading ? (
           <div className="p-10 text-center text-slate-500 dark:text-slate-400">Loading data...</div>
@@ -336,15 +415,41 @@ export default function SheetView() {
         ) : (
           <div className="overflow-auto max-h-[70vh]">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0">
+              <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0 z-10 shadow-sm">
                 <tr>
-                  {data.headers.map((h, i) => (
-                    <th key={i} className="px-3 py-2 text-left font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
+                  {data.headers.map((h, i) => {
+                    const isSorted = sortCol === i;
+                    return (
+                      <th
+                        key={i}
+                        onClick={() => handleHeaderClick(i)}
+                        className={`group px-3 py-2.5 text-left font-semibold text-xs whitespace-nowrap cursor-pointer select-none transition ${
+                          isSorted
+                            ? 'bg-indigo-100/90 dark:bg-indigo-950 text-indigo-900 dark:text-indigo-200'
+                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
+                        }`}
+                        title={`Click to sort by "${h}" (${isSorted ? (sortDir === 'asc' ? 'Ascending → Descending' : 'Descending → Reset') : 'Ascending'})`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{h}</span>
+                          <div className="shrink-0">
+                            {isSorted ? (
+                              sortDir === 'asc' ? (
+                                <ArrowUp size={14} className="text-indigo-600 dark:text-indigo-400 font-bold" />
+                              ) : (
+                                <ArrowDown size={14} className="text-indigo-600 dark:text-indigo-400 font-bold" />
+                              )
+                            ) : (
+                              <ArrowUpDown size={13} className="text-slate-400 opacity-40 group-hover:opacity-100 transition" />
+                            )}
+                          </div>
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
+
               <tbody>
                 {filtered.length === 0 ? (
                   <tr className="border-t border-slate-200 dark:border-slate-800">
