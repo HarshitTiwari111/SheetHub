@@ -357,7 +357,14 @@ export default function SheetView() {
 
   return (
     <div className="space-y-4">
-      {/* Top Controls & Action Toolbar */}
+      {/* KPI Top Summary Cards (Rendered at Very Top) */}
+      {!loading && data.headers.length > 0 && (
+        <KPICards headers={data.headers} rows={filtered} columnTypes={columnTypes} />
+      )}
+
+      {err && <div className="bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 p-3 rounded-xl text-sm border border-red-200 dark:border-red-900">{err}</div>}
+
+      {/* Top Controls & Action Toolbar (Rendered Below KPI Cards) */}
       <div className="flex items-center justify-between flex-wrap gap-2.5 bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
           {/* Search Input */}
@@ -370,8 +377,6 @@ export default function SheetView() {
               className="w-full pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition"
             />
           </div>
-
-
 
           {/* Date Filter Dropdown */}
           <div className="relative">
@@ -469,12 +474,6 @@ export default function SheetView() {
         </div>
       </div>
 
-      {err && <div className="bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 p-3 rounded text-sm">{err}</div>}
-
-      {/* KPI Top Summary Cards */}
-      {!loading && data.headers.length > 0 && (
-        <KPICards headers={data.headers} rows={filtered} columnTypes={columnTypes} />
-      )}
 
       {/* Tabs bar */}
       {tabs.length > 0 && (
