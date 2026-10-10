@@ -46,23 +46,26 @@ export default function SheetView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { effectiveUser } = useImpersonation();
-  const { reloadSheets, sheets, setHeaderInfo } = useOutletContext();
-
-  useEffect(() => {
-    if (sheet && setHeaderInfo) {
-      setHeaderInfo({ title: sheet.name, googleSheetUrl: sheet.url });
-    }
-    return () => {
-      if (setHeaderInfo) setHeaderInfo({ title: 'SheetHub', googleSheetUrl: null });
-    };
-  }, [sheet, setHeaderInfo]);
-
+  const outletCtx = useOutletContext() || {};
+  const { reloadSheets, sheets, setHeaderInfo } = outletCtx;
   const { cache, getSheetData, invalidate, syncInterval, setSyncInterval, cacheKey } = useSheetData();
   const isAdmin = isAdminLevel(effectiveUser?.role);
   const [sheet, setSheet] = useState(() => sheets?.find((s) => s._id === id) || null);
+
+  useEffect(() => {
+    if (sheet?.name && setHeaderInfo) {
+      setHeaderInfo((prev) => {
+        if (prev?.title === sheet.name && prev?.googleSheetUrl === sheet.url) return prev;
+        return { title: sheet.name, googleSheetUrl: sheet.url };
+      });
+    }
+  }, [sheet?.name, sheet?.url, setHeaderInfo]);
+
+
   const [tabs, setTabs] = useState([]);
   const [activeGid, setActiveGid] = useState(null);
   const [tabsLoading, setTabsLoading] = useState(false);
+
   const cachedEntry = cache[cacheKey(id, activeGid)];
   const [data, setData] = useState(() => cachedEntry?.data || { headers: [], rows: [] });
   const [loading, setLoading] = useState(!cachedEntry);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { LogOut, User as UserIcon, ChevronDown, Sun, Moon, Eye, X, KeyRound, Menu, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -34,7 +34,12 @@ export default function Layout() {
   const [headerInfo, setHeaderInfo] = useState({ title: 'SheetHub', googleSheetUrl: null });
   const menuRef = useRef(null);
 
+  const updateHeaderInfo = useCallback((val) => {
+    setHeaderInfo(val);
+  }, []);
+
   const loadSheets = () => api.get('/sheets').then((r) => setSheets(r.data));
+
 
   useEffect(() => { loadSheets(); }, [refreshKey]);
 
@@ -150,8 +155,9 @@ export default function Layout() {
         </header>
 
         <main className="flex-1 p-3 sm:p-4 overflow-auto">
-          <Outlet context={{ sheets, reloadSheets: () => setRefreshKey((k) => k + 1), setHeaderInfo }} />
+          <Outlet context={{ sheets, reloadSheets: () => setRefreshKey((k) => k + 1), setHeaderInfo: updateHeaderInfo }} />
         </main>
+
       </div>
 
 
