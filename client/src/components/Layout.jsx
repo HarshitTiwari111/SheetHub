@@ -154,7 +154,8 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 p-3 sm:p-4 overflow-auto">
+        <main className="flex-1 p-3 sm:p-4 overflow-auto no-scrollbar">
+
           <Outlet context={{ sheets, reloadSheets: () => setRefreshKey((k) => k + 1), setHeaderInfo: updateHeaderInfo }} />
         </main>
 

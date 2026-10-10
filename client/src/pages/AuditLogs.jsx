@@ -92,7 +92,8 @@ export default function AuditLogs() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-auto max-h-[75vh]">
+        <div className="overflow-auto max-h-[75vh] no-scrollbar">
+
           <table className="w-full text-sm min-w-[700px]">
             <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
               <tr>

@@ -519,7 +519,8 @@ export default function SheetView() {
         ) : data.headers.length === 0 ? (
           <div className="p-10 text-center text-slate-500 dark:text-slate-400">No data in this sheet</div>
         ) : (
-          <div className="overflow-auto max-h-[70vh]">
+          <div className="overflow-auto max-h-[70vh] no-scrollbar">
+
             <table className="min-w-full text-sm">
               <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0 z-10 shadow-sm">
                 <tr>
