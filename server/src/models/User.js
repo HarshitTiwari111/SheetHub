@@ -1,8 +1,14 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const ROLES = ['admin', 'user'];
-const ROLE_RANK = { admin: 2, user: 1 };
+const ROLES = ['superadmin', 'admin', 'manager', 'employee', 'user'];
+const ROLE_RANK = {
+  superadmin: 4,
+  admin: 3,
+  manager: 2,
+  employee: 1,
+  user: 1, // alias for employee
+};
 
 const userSchema = new mongoose.Schema(
   {
@@ -16,12 +22,35 @@ const userSchema = new mongoose.Schema(
       maxlength: 200,
     },
     password: { type: String, required: true, minlength: 6, select: false },
-    role: { type: String, enum: ROLES, default: 'user', index: true },
+    role: { type: String, enum: ROLES, default: 'employee', index: true },
     active: { type: Boolean, default: true },
     lastLoginAt: { type: Date },
     lastLoginIp: { type: String },
+    lastLoginUserAgent: { type: String },
     failedLoginAttempts: { type: Number, default: 0 },
     lockedUntil: { type: Date },
+
+    // 2FA Fields
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorSecret: { type: String, select: false },
+
+    // Login Alerts & Device Tracking
+    knownDevices: [
+      {
+        ip: { type: String },
+        userAgent: { type: String },
+        firstSeenAt: { type: Date, default: Date.now },
+        lastSeenAt: { type: Date, default: Date.now },
+      },
+    ],
+    suspiciousLogins: [
+      {
+        ip: { type: String },
+        userAgent: { type: String },
+        timestamp: { type: Date, default: Date.now },
+        reason: { type: String },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -43,15 +72,17 @@ userSchema.methods.isLocked = function () {
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.twoFactorSecret;
   delete obj.failedLoginAttempts;
   delete obj.lockedUntil;
   return obj;
 };
 
 const User = mongoose.model('User', userSchema);
-User.ROLES = ROLES;
+User.ROLES = ['superadmin', 'admin', 'manager', 'employee'];
 User.ROLE_RANK = ROLE_RANK;
 User.canManage = (actorRole, targetRole) =>
   (ROLE_RANK[actorRole] || 0) > (ROLE_RANK[targetRole] || 0);
 
 module.exports = User;
+

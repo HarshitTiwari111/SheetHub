@@ -9,11 +9,14 @@ const { audit } = require('../utils/audit');
 
 router.use(protect);
 
-// Admin sees all, users see only their own
-const scopeFilter = (user) => (user.role === 'admin' ? {} : { createdBy: user._id });
+// SuperAdmin, Admin, Manager see all sheets, Employee sees assigned/created sheets
+const canManageSheets = (user) => ['superadmin', 'admin', 'manager'].includes(user.role);
+
+const scopeFilter = (user) => (canManageSheets(user) ? {} : { createdBy: user._id });
 
 const canAccessSheet = (user, sheet) =>
-  user.role === 'admin' || String(sheet.createdBy) === String(user._id);
+  canManageSheets(user) || String(sheet.createdBy) === String(user._id);
+
 
 router.get('/', async (req, res) => {
   const sheets = await Sheet.find(scopeFilter(req.user)).sort({ order: 1, createdAt: 1 });

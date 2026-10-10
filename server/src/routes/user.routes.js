@@ -23,6 +23,13 @@ router.post(
   async (req, res) => {
     const { name, email, password, role } = req.body;
 
+    const actorRank = User.ROLE_RANK[req.user.role] || 1;
+    const targetRank = User.ROLE_RANK[role] || 1;
+
+    if (actorRank < targetRank) {
+      return res.status(403).json({ message: `Cannot create user with role '${role}' higher than your rank.` });
+    }
+
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ message: 'Email already in use' });
 
@@ -44,6 +51,20 @@ router.put(
   async (req, res) => {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: 'User not found' });
+
+    const actorRank = User.ROLE_RANK[req.user.role] || 1;
+    const targetCurrentRank = User.ROLE_RANK[target.role] || 1;
+
+    if (actorRank < targetCurrentRank && String(req.user._id) !== String(target._id)) {
+      return res.status(403).json({ message: 'Cannot edit user with a higher rank than your own.' });
+    }
+
+    if (req.body.role) {
+      const newRoleRank = User.ROLE_RANK[req.body.role] || 1;
+      if (actorRank < newRoleRank) {
+        return res.status(403).json({ message: `Cannot assign role '${req.body.role}' higher than your rank.` });
+      }
+    }
 
     const before = { name: target.name, email: target.email, role: target.role, active: target.active };
     if (req.body.name) target.name = req.body.name;
@@ -73,8 +94,16 @@ router.put(
 router.delete('/:id', param('id').isMongoId(), validate, async (req, res) => {
   if (String(req.user._id) === String(req.params.id))
     return res.status(400).json({ message: 'Cannot delete yourself' });
+
   const target = await User.findById(req.params.id);
   if (!target) return res.status(404).json({ message: 'User not found' });
+
+  const actorRank = User.ROLE_RANK[req.user.role] || 1;
+  const targetRank = User.ROLE_RANK[target.role] || 1;
+
+  if (actorRank <= targetRank && req.user.role !== 'superadmin') {
+    return res.status(403).json({ message: 'Cannot delete user with equal or higher rank.' });
+  }
 
   await User.deleteOne({ _id: target._id });
   await RefreshToken.deleteMany({ user: target._id });

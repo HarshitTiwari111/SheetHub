@@ -20,12 +20,36 @@ const protect = async (req, res, next) => {
 
 const requireRole = (...allowedRoles) => (req, res, next) => {
   if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
-  if (!allowedRoles.includes(req.user.role)) {
-    return res.status(403).json({ message: `Requires one of: ${allowedRoles.join(', ')}` });
+  
+  // Allow superadmin for all admin routes, user -> employee alias
+  const userRole = req.user.role === 'user' ? 'employee' : req.user.role;
+  const isAllowed = allowedRoles.includes(userRole) || userRole === 'superadmin';
+
+  if (!isAllowed) {
+    return res.status(403).json({ message: `Access denied. Requires one of: ${allowedRoles.join(', ')}` });
   }
   next();
 };
 
-const adminLevel = requireRole('admin');
+const requireMinRole = (minRole) => (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+  const userRank = User.ROLE_RANK[req.user.role] || 1;
+  const minRank = User.ROLE_RANK[minRole] || 1;
+  if (userRank < minRank) {
+    return res.status(403).json({ message: `Access denied. Requires minimum role: ${minRole}` });
+  }
+  next();
+};
 
-module.exports = { protect, requireRole, adminLevel };
+const superAdminLevel = requireRole('superadmin');
+const adminLevel = requireRole('superadmin', 'admin');
+const managerLevel = requireRole('superadmin', 'admin', 'manager');
+
+module.exports = {
+  protect,
+  requireRole,
+  requireMinRole,
+  superAdminLevel,
+  adminLevel,
+  managerLevel,
+};
