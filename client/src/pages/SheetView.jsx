@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 
 function getPageNumbers(current, total) {
@@ -713,7 +714,7 @@ export default function SheetView() {
         onCancel={() => setShowDelete(false)}
       />
 
-      {showCustomDateModal && (
+      {showCustomDateModal && createPortal(
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
           <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl shadow-indigo-500/10 space-y-5 text-slate-900 dark:text-slate-100 overflow-hidden">
             {/* Top decorative gradient line */}
@@ -847,7 +848,8 @@ export default function SheetView() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
