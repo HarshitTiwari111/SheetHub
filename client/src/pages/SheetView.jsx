@@ -714,75 +714,134 @@ export default function SheetView() {
       />
 
       {showCustomDateModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl text-slate-900 dark:text-slate-100">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold flex items-center gap-2">
-                <Calendar size={18} className="text-indigo-600 dark:text-indigo-400" /> Select Custom Date Range
-              </h3>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl shadow-indigo-500/10 space-y-5 text-slate-900 dark:text-slate-100 overflow-hidden">
+            {/* Top decorative gradient line */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 pt-1">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-100 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold shadow-sm shrink-0">
+                  <Calendar size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
+                    Filter by Date Range
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Select column & custom interval for sheet records
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setShowCustomDateModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               >
                 <X size={18} />
               </button>
             </div>
 
+            {/* Quick Preset Chips */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">
+                Quick Presets
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { key: 'today', label: 'Today' },
+                  { key: 'yesterday', label: 'Yesterday' },
+                  { key: 'last7days', label: 'Last 7 days' },
+                  { key: 'thisMonth', label: 'This month' },
+                  { key: 'lastMonth', label: 'Last month' },
+                  { key: 'thisYear', label: 'This year' },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => applyDatePreset(key)}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition ${
+                      datePreset === key
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Target Date Column Dropdown */}
             {data.headers.length > 0 && (
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Date Column
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
+                  Target Date Column
                 </label>
                 <select
                   value={dateColumn ?? ''}
                   onChange={(e) => setDateColumn(e.target.value === '' ? null : parseInt(e.target.value, 10))}
-                  className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none"
+                  className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition cursor-pointer"
                 >
                   {data.headers.map((h, i) => (
                     <option key={i} value={i}>
-                      {h} {columnTypes[i] === 'date' ? '(Date Column)' : ''}
+                      {h} {columnTypes[i] === 'date' ? '📅 (Detected Date)' : ''}
                     </option>
                   ))}
                 </select>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* Date Inputs (From & To) */}
+            <div className="grid grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">From Date</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
+                  From Date
+                </label>
                 <input
                   type="date"
                   value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-2.5 py-2 text-xs outline-none focus:border-indigo-500"
+                  onChange={(e) => {
+                    setDateFrom(e.target.value);
+                    setDatePreset('custom');
+                  }}
+                  className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition cursor-pointer"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">To Date</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
+                  To Date
+                </label>
                 <input
                   type="date"
                   value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-2.5 py-2 text-xs outline-none focus:border-indigo-500"
+                  onChange={(e) => {
+                    setDateTo(e.target.value);
+                    setDatePreset('custom');
+                  }}
+                  className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition cursor-pointer"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            {/* Actions */}
+            <div className="flex items-center gap-3 pt-2">
               <button
+                type="button"
                 onClick={() => {
                   setDatePreset('all');
                   setDateFrom('');
                   setDateTo('');
                   setShowCustomDateModal(false);
                 }}
-                className="px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="w-1/2 py-2.5 px-4 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-[0.98]"
               >
                 Reset Filter
               </button>
               <button
+                type="button"
                 onClick={() => setShowCustomDateModal(false)}
-                className="px-4 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow"
+                className="w-1/2 py-2.5 px-4 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/25 transition active:scale-[0.98]"
               >
                 Apply Range
               </button>
