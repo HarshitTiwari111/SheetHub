@@ -39,7 +39,9 @@ import AddSheetModal from '../components/AddSheetModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import FilterPanel from '../components/FilterPanel.jsx';
 import TotalsBar from '../components/TotalsBar.jsx';
-import { detectColumnTypes, aggregate, parseDate, fromDateInput } from '../utils/columnAnalysis';
+import KPICards from '../components/KPICards.jsx';
+import { detectColumnTypes, aggregate, parseDate, fromDateInput, parseNumber, formatNumber } from '../utils/columnAnalysis';
+
 
 export default function SheetView() {
   const { id } = useParams();
@@ -369,6 +371,11 @@ export default function SheetView() {
 
       {err && <div className="bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 p-3 rounded text-sm">{err}</div>}
 
+      {/* KPI Top Summary Cards */}
+      {!loading && data.headers.length > 0 && (
+        <KPICards headers={data.headers} rows={filtered} columnTypes={columnTypes} />
+      )}
+
       {/* Tabs bar */}
       {tabs.length > 0 && (
         <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-slate-800">
@@ -467,10 +474,49 @@ export default function SheetView() {
                   ))
                 )}
               </tbody>
+
+              {/* Bottom / Last Summary Totals Row */}
+              {filtered.length > 0 && (
+                <tfoot className="bg-slate-100/95 dark:bg-slate-800/95 border-t-2 border-indigo-200 dark:border-indigo-800 sticky bottom-0 z-10 shadow-md">
+                  <tr>
+                    {data.headers.map((h, j) => {
+                      if (j === 0) {
+                        return (
+                          <td key={j} className="px-3 py-2.5 whitespace-nowrap text-xs text-indigo-700 dark:text-indigo-300 font-bold">
+                            Total ({filtered.length} rows)
+                          </td>
+                        );
+                      }
+                      if (columnTypes[j] === 'number') {
+                        let sum = 0;
+                        let count = 0;
+                        for (const r of filtered) {
+                          const n = parseNumber(r[j]);
+                          if (!isNaN(n)) {
+                            sum += n;
+                            count++;
+                          }
+                        }
+                        return (
+                          <td key={j} className="px-3 py-2.5 whitespace-nowrap text-xs font-extrabold text-emerald-700 dark:text-emerald-400">
+                            {count > 0 ? formatNumber(sum, 'sum') : '—'}
+                          </td>
+                        );
+                      }
+                      return (
+                        <td key={j} className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-400">
+                          —
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         )}
       </div>
+
 
       {/* Pagination */}
       {filtered.length > 0 && (
