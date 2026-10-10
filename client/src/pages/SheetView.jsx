@@ -46,7 +46,17 @@ export default function SheetView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { effectiveUser } = useImpersonation();
-  const { reloadSheets, sheets } = useOutletContext();
+  const { reloadSheets, sheets, setHeaderInfo } = useOutletContext();
+
+  useEffect(() => {
+    if (sheet && setHeaderInfo) {
+      setHeaderInfo({ title: sheet.name, googleSheetUrl: sheet.url });
+    }
+    return () => {
+      if (setHeaderInfo) setHeaderInfo({ title: 'SheetHub', googleSheetUrl: null });
+    };
+  }, [sheet, setHeaderInfo]);
+
   const { cache, getSheetData, invalidate, syncInterval, setSyncInterval, cacheKey } = useSheetData();
   const isAdmin = isAdminLevel(effectiveUser?.role);
   const [sheet, setSheet] = useState(() => sheets?.find((s) => s._id === id) || null);
@@ -344,26 +354,21 @@ export default function SheetView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between flex-wrap gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 truncate">{sheet?.name || 'Loading...'}</h2>
-          {sheet && (
-            <a href={sheet.url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1">
-              Open in Google Sheets <ExternalLink size={12} />
-            </a>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* Top Controls & Action Toolbar */}
+      <div className="flex items-center justify-between flex-wrap gap-2.5 bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
           {/* Search Input */}
-          <div className="relative">
-            <Search size={14} className="absolute left-2 top-2.5 text-slate-400" />
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search..."
-              className="pl-7 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-slate-100 rounded text-sm outline-none"
+              placeholder="Search in sheet..."
+              className="w-full pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition"
             />
           </div>
+
+
 
           {/* Date Filter Dropdown */}
           <div className="relative">
