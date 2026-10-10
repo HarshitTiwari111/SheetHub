@@ -30,7 +30,7 @@ function TimeAgo({ ts }) {
   return <span>{Math.floor(hrs / 24)}d ago</span>;
 }
 
-import { RefreshCw, Search, ExternalLink, Pencil, Trash2, Clock, ChevronLeft, ChevronRight, Filter, ArrowUp, ArrowDown, ArrowUpDown, X } from 'lucide-react';
+import { RefreshCw, Search, ExternalLink, Pencil, Trash2, Clock, ChevronLeft, ChevronRight, Filter, ArrowUp, ArrowDown, ArrowUpDown, X, Calendar } from 'lucide-react';
 import api from '../api/client';
 import { useImpersonation } from '../context/ImpersonationContext.jsx';
 import { isAdminLevel } from '../context/AuthContext.jsx';
@@ -40,8 +40,7 @@ import ConfirmModal from '../components/ConfirmModal.jsx';
 import FilterPanel from '../components/FilterPanel.jsx';
 import TotalsBar from '../components/TotalsBar.jsx';
 import KPICards from '../components/KPICards.jsx';
-import { detectColumnTypes, aggregate, parseDate, fromDateInput, parseNumber, formatNumber } from '../utils/columnAnalysis';
-
+import { detectColumnTypes, aggregate, parseDate, fromDateInput, parseNumber, formatNumber, toDateInput } from '../utils/columnAnalysis';
 
 export default function SheetView() {
   const { id } = useParams();
@@ -66,9 +65,14 @@ export default function SheetView() {
   const [pageSize, setPageSize] = useState(100);
   const [showFilters, setShowFilters] = useState(false);
   const filterBtnRef = useRef(null);
+
+  // Date Filter & Presets State
+  const [datePreset, setDatePreset] = useState('all');
+  const [showCustomDateModal, setShowCustomDateModal] = useState(false);
   const [dateColumn, setDateColumn] = useState(null);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
   const [selectedMetrics, setSelectedMetrics] = useState([]);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -77,6 +81,68 @@ export default function SheetView() {
   // ASC / DESC Column Sorting State
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState('asc'); // 'asc' or 'desc'
+
+  const applyDatePreset = (presetKey) => {
+    setDatePreset(presetKey);
+
+    // Auto detect target date column if not set
+    let targetCol = dateColumn;
+    if (targetCol === null || targetCol === undefined) {
+      targetCol = data.headers.findIndex((h, i) => columnTypes[i] === 'date');
+      if (targetCol === -1) {
+        targetCol = data.headers.findIndex((h) => /date|time|timestamp|created/i.test(h));
+      }
+      if (targetCol !== -1) setDateColumn(targetCol);
+    }
+
+    const now = new Date();
+
+    if (presetKey === 'all') {
+      setDateFrom('');
+      setDateTo('');
+      setShowCustomDateModal(false);
+      return;
+    }
+
+    if (presetKey === 'today') {
+      const todayStr = toDateInput(now);
+      setDateFrom(todayStr);
+      setDateTo(todayStr);
+      setShowCustomDateModal(false);
+    } else if (presetKey === 'yesterday') {
+      const yest = new Date(now);
+      yest.setDate(now.getDate() - 1);
+      const yestStr = toDateInput(yest);
+      setDateFrom(yestStr);
+      setDateTo(yestStr);
+      setShowCustomDateModal(false);
+    } else if (presetKey === 'last7days') {
+      const past7 = new Date(now);
+      past7.setDate(now.getDate() - 6);
+      setDateFrom(toDateInput(past7));
+      setDateTo(toDateInput(now));
+      setShowCustomDateModal(false);
+    } else if (presetKey === 'thisMonth') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      setDateFrom(toDateInput(firstDay));
+      setDateTo(toDateInput(now));
+      setShowCustomDateModal(false);
+    } else if (presetKey === 'lastMonth') {
+      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      setDateFrom(toDateInput(firstDayLastMonth));
+      setDateTo(toDateInput(lastDayLastMonth));
+      setShowCustomDateModal(false);
+    } else if (presetKey === 'thisYear') {
+      const firstDayYear = new Date(now.getFullYear(), 0, 1);
+      setDateFrom(toDateInput(firstDayYear));
+      setDateTo(toDateInput(now));
+      setShowCustomDateModal(false);
+    } else if (presetKey === 'custom') {
+      setShowCustomDateModal(true);
+    }
+  };
+
 
   const doDelete = async () => {
     setDeleting(true);
@@ -288,6 +354,7 @@ export default function SheetView() {
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Search Input */}
           <div className="relative">
             <Search size={14} className="absolute left-2 top-2.5 text-slate-400" />
             <input
@@ -297,6 +364,30 @@ export default function SheetView() {
               className="pl-7 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-slate-100 rounded text-sm outline-none"
             />
           </div>
+
+          {/* Date Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={datePreset}
+              onChange={(e) => applyDatePreset(e.target.value)}
+              className={`px-3 py-1.5 border rounded text-sm font-medium outline-none transition cursor-pointer ${
+                datePreset !== 'all'
+                  ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+              title="Filter by date range"
+            >
+              <option value="all">Date: All</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="last7days">Last 7 days</option>
+              <option value="thisMonth">This month</option>
+              <option value="lastMonth">Last month</option>
+              <option value="thisYear">This year</option>
+              <option value="custom">Custom range...</option>
+            </select>
+          </div>
+
           <select
             value={syncInterval}
             onChange={(e) => setSyncInterval(parseInt(e.target.value, 10))}
@@ -307,6 +398,7 @@ export default function SheetView() {
               <option key={o.value} value={o.value}>Auto-sync: {o.label}</option>
             ))}
           </select>
+
           <button
             onClick={() => { loadTabs(); load({ force: true, gid: activeGid }); }}
             disabled={refreshing}
@@ -612,6 +704,85 @@ export default function SheetView() {
         onConfirm={doDelete}
         onCancel={() => setShowDelete(false)}
       />
+
+      {showCustomDateModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl text-slate-900 dark:text-slate-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <Calendar size={18} className="text-indigo-600 dark:text-indigo-400" /> Select Custom Date Range
+              </h3>
+              <button
+                onClick={() => setShowCustomDateModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {data.headers.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Date Column
+                </label>
+                <select
+                  value={dateColumn ?? ''}
+                  onChange={(e) => setDateColumn(e.target.value === '' ? null : parseInt(e.target.value, 10))}
+                  className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none"
+                >
+                  {data.headers.map((h, i) => (
+                    <option key={i} value={i}>
+                      {h} {columnTypes[i] === 'date' ? '(Date Column)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">From Date</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-2.5 py-2 text-xs outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">To Date</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-2.5 py-2 text-xs outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setDatePreset('all');
+                  setDateFrom('');
+                  setDateTo('');
+                  setShowCustomDateModal(false);
+                }}
+                className="px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Reset Filter
+              </button>
+              <button
+                onClick={() => setShowCustomDateModal(false)}
+                className="px-4 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow"
+              >
+                Apply Range
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
